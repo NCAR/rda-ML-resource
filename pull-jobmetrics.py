@@ -40,6 +40,7 @@ def grab_bucket_contents(url, bucket, prefix):
     # Therefore object_keys is the list of filenames we're interested in.
     # We use these filenames to retrieve the files themselves.
 
+
     objects = [client.get_object(Bucket=bucket, Key=k) for k in obj_keys]
     obj_bodies = [ob['Body'] for ob in objects]
 

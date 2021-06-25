@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 def load_data():
     training_path = '/glade/work/jdubeau/job-metrics-training.json'
@@ -107,4 +108,14 @@ def get_df():
     df = add_new_features(df)
     df = handle_missing(df)
     return df
+
+def scale(X_train, X_val, X_test):
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+
+    X_train_norm = scaler.transform(X_train)
+    X_val_norm = scaler.transform(X_val)
+    X_test_norm = scaler.transform(X_test)
+    
+    return X_train_norm, X_val_norm, X_test_norm
 

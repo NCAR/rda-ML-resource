@@ -568,12 +568,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-        #cProfile.run('main()', 'program-stats')
-        #p = pstats.Stats('program-stats')
-        #p.strip_dirs().sort_stats(SortKey.TIME).print_stats(20)
     except Exception as e:
         logging.error(e, exc_info=True)
         # Default value: 1234mb, 11:58:20 walltime
         print(format_predictions(1234, 43100))
-    #main()
-    

@@ -1,3 +1,4 @@
+#!/glade/u/home/jdubeau/github/rda-ML-resource/venv/bin/python3
 # Full machine learning process, start to finish:
 # Takes in an rindex number and request type, and uses the current best 
 # ML models to predict the time and the request will use.
@@ -15,26 +16,35 @@ from math import exp
 import mysql.connector
 import json
 import sys
+import logging
+
+log_file = '/glade/u/home/jdubeau/github/rda-ML-resource/apply-model.log'
+logging.basicConfig(filename=log_file,
+                    format='%(asctime)s %(levelname)-8s %(message)s',
+                    level=logging.INFO,
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
+def get_settings():
+    global settings
+    config_file = open("/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json")
+    settings = json.load(config_file)
+    config_file.close()
 
 def read_args():
     '''Reads command-line arguments and returns them, after translating the
     request type from 'P', 'R', or 'S' to 'PP', 'BR', or 'SP' respectively.
     
-    Checks that the given rindex is an integer and the given request type
-    is one of P, R, S.
+    The given rindex must be an integer and the given request type must
+    be one of P, R, S.
     '''
-    if len(sys.argv) != 3:
-        raise SystemExit(f"Usage: {sys.argv[0]} <rindex> <rtype>")
-
     rtype_dict = {'P':'PP', 'R':'BR', 'S':'SP'}
     
+    rindex = int(sys.argv[1])
     try:
-        rindex = int(sys.argv[1])
         request_type = rtype_dict[sys.argv[2]]
-    except:
-        raise ValueError("Invalid rindex or request type. " 
-                         + "rindex must be an integer, request type must be "
-                         + "one of 'P', 'R', 'S'. ")
+    except (IndexError, KeyError):
+        logging.warning("Missing or invalid request type. Default request type SP assumed.")
+        request_type = 'SP'
     
     return rindex, request_type
 
@@ -47,11 +57,8 @@ def get_rinfo(rindex):
     rindex : int
         rindex number to look up.
     '''
-    credentials_path = './dsrqst-creds.json'
-    try:
-        credentials = json.load(open(credentials_path))
-    except:
-        raise FileNotFoundError(f"Could not find dsrqst credentials file at {credentials_path}")
+    credentials_path = '/glade/u/home/jdubeau/github/rda-ML-resource/dsrqst-creds.json'
+    credentials = json.load(open(credentials_path))
         
     host_name = 'rda-db.ucar.edu'
     db_name = 'dssdb'
@@ -64,11 +71,8 @@ def get_rinfo(rindex):
     curs.execute("SELECT rinfo FROM dsrqst WHERE rindex = %s",
                  (rindex,))
     
-    try:
-        rinfo = curs.fetchone()[0]
-    except:
-        raise ValueError(f"Found no rinfo string matching rindex {rindex}.")
-    
+    rinfo = curs.fetchone()[0]
+   
     conn.close()
     return rinfo
 
@@ -116,20 +120,18 @@ def format_rinfo_val(rinfo, feature, val):
     if val == '':
         return handle_missing_rinfo_val(feature)
 
-    try:
-        if feature in ['elon', 'wlon', 'nlat', 'slat']:
-            return float(val)
-        elif feature in ['startdate', 'enddate']:
-            return pd.to_datetime(val, errors='coerce')
-        elif feature in ['gindex', 'tindex']:
-            return float(val)
-        elif feature == 'gui':
-            return True if val == 'yes' else False
-        else:
-            return val
-    except:
-        failed_parse.write(f"Could not parse {feature} from {val}. \n")
-        failed_parse.write(f"rinfo string: {rinfo} \n")
+    if feature in ['elon', 'wlon', 'nlat', 'slat']:
+        return float(val)
+    elif feature in ['startdate', 'enddate']:
+        try:
+            return pd.to_datetime(val)
+        except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime:
+            return pd.Timestamp.min
+    elif feature in ['gindex', 'tindex']:
+        return float(val)
+    elif feature == 'gui':
+        return True if val == 'yes' else False
+    else:
         return val
 
     
@@ -177,7 +179,7 @@ def get_rinfo_val(rinfo, feature, rinfo_feature_names):
     return val
 
 
-    def valid_rinfo(rinfo):
+def valid_rinfo(rinfo):
     """Currently unused.
     Decides whether an rinfo string is 'valid.'
     In practice, just serves to filter out a few problematic rinfo strings.
@@ -295,8 +297,10 @@ def parse_dates(feature, dates):
             
         if '-' not in dates_split[0]:
             date = date[:4] + '-' + date[4:]
-    
-    return pd.to_datetime(date, errors='coerce')
+    try:
+        return pd.to_datetime(date)
+    except pd._libs.tslibs.np_datetime.OutOfBoundsDatetime:
+        return pd.Timestamp.min
 
 
 def update_dates(feature, row):
@@ -407,7 +411,7 @@ def get_rinfo_feature_names():
                           'station', 'tindex', 'wlon']
 
     special_alt_names = {'grid_definition': ['grid_definition', 'grid-definition'],
-                         'parameters': ['parameters', 'params', 'parms'],
+                         'parameters': ['parameters', 'params', 'parms', 'vars'],
                          'format': ['format', 'ofmt', 'fmt'],
                          'tindex': ['tindex', 'gindex']}
     
@@ -430,8 +434,6 @@ def add_rinfo_features(df):
         Dataframe with rinfo column.
     '''
     rinfo_feature_names = get_rinfo_feature_names()
-    
-    failed_parse = open('failed-parse.txt', 'w')
 
     for feature in rinfo_feature_names:
         df[feature] = df.apply(lambda row: 
@@ -440,7 +442,6 @@ def add_rinfo_features(df):
                                              rinfo_feature_names),
                                axis = 1)
 
-    failed_parse.close()
     return df
 
 def combine_redundant_features(df):    
@@ -494,7 +495,7 @@ def process_with_model(df, X_features, X_train):
     
     return X
 
-def predict_with_model(X, model, target):
+def predict_with_model(X, model, categories_dict, target):
     '''Use the model to predict either the wall time or the used
     memory for the given (already processed) input data.
     
@@ -508,17 +509,17 @@ def predict_with_model(X, model, target):
     target : str
         Either 'mem' or 'time'.
     '''
-    if target == 'mem':
-        categories_dict = {0:50, 1:100, 2:200,
-                           3:500, 4:1000, 5:2000,
-                           6:10000, 7:20000, 8:50000}
-    else:
-        categories_dict = {0:60, 1:120, 2:300, 
-                           3:600, 4:1800, 5:3600,
-                           6:14400, 7:43200}
-
     pred_categories = custom_predict(X, model)
-    predictions = translate_predictions(pred_categories, categories_dict)
+    
+    if target == 'mem':
+        predictions = translate_predictions(pred_categories, 
+                                        categories_dict,
+                                        **settings['mem_scaling'])
+    else:
+        predictions = translate_predictions(pred_categories, 
+                                        categories_dict,
+                                        **settings['time_scaling'])
+    
     return predictions
 
 def format_predictions(mem, time):
@@ -540,14 +541,13 @@ def format_predictions(mem, time):
     return output_string
 
 def main():
-    mem_model_save_path = '/glade/work/jdubeau/model-saves/class_forest_final2021-07-01-18:05/'
-    time_model_save_path = '/glade/work/jdubeau/model-saves/time_forest2021-07-07-13:48/'
-    save_paths = {'mem': mem_model_save_path, 'time': time_model_save_path}
+    get_settings()
+    save_paths = settings['model_paths']
     
     rindex, request_type = read_args()
     rinfo = get_rinfo(rindex)
-    input_df = pd.DataFrame([[request_type, rinfo]], columns=['request_type', 'rinfo'])
 
+    input_df = pd.DataFrame([[request_type, rinfo]], columns=['request_type', 'rinfo'])
     input_df = add_rinfo_features(input_df)
     input_df = combine_redundant_features(input_df)
     
@@ -556,9 +556,9 @@ def main():
     for target in ['mem', 'time']:
         ms = model_saver()
         ms.load(save_paths[target])
-        model, X_features, X_train = ms.get_min()
+        model, categories_dict, X_features, X_train = ms.get_min()
         X = process_with_model(input_df, X_features, X_train)
-        pred = predict_with_model(X, model, target)
+        pred = predict_with_model(X, model, categories_dict, target)
         predictions.append(pred)
     
     predictions = np.ravel(predictions)
@@ -567,9 +567,13 @@ def main():
 
 if __name__ == "__main__":
     try:
-        #cProfile.run('main()', 'program-stats')
         main()
-    except:
-        print(sys.exc_info())
-    #p = pstats.Stats('program-stats')
-    #p.strip_dirs().sort_stats(SortKey.TIME).print_stats(20)
+        #cProfile.run('main()', 'program-stats')
+        #p = pstats.Stats('program-stats')
+        #p.strip_dirs().sort_stats(SortKey.TIME).print_stats(20)
+    except Exception as e:
+        logging.error(e, exc_info=True)
+        # Default value: 1234mb, 11:58:20 walltime
+        print(format_predictions(1234, 43100))
+    #main()
+    

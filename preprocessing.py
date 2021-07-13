@@ -21,7 +21,7 @@ def timespan_feat(row):
 
 
 def list_length_feat(feature, row, sep = ','):
-    if row[feature] != None:
+    if row[feature] != None and row[feature] == row[feature]:
         return len(row[feature].split(sep))
     else:
         return 0
@@ -80,10 +80,11 @@ def add_feature(feature, df):
         
     return df
 
-def add_new_features(df):
-    new_features = ['wall_time', 'rqst_timespan', 'grid_def_num', 'level_num',
-                    'product_num', 'station_num', 'params_num', 
-                    'rqst_area_rect', 'PP', 'SP', 'BR', 'converted']
+def add_new_features(df, new_features=None):
+    if new_features == None:
+        new_features = ['wall_time', 'rqst_timespan', 'grid_def_num', 'level_num',
+                        'product_num', 'station_num', 'params_num', 
+                        'rqst_area_rect', 'PP', 'SP', 'BR', 'converted']
     
     most_common = df['dsnum'].value_counts()[:5].index.tolist()
     for common_id in most_common:
@@ -97,7 +98,7 @@ def add_new_features(df):
 
 def handle_missing(df):
     df['rqst_area_rect'] = df.apply(lambda row: 
-                                0 if row['rqst_area_rect'] != row['rqst_area_rect'] 
+                                129600 if row['rqst_area_rect'] != row['rqst_area_rect'] 
                                 else row['rqst_area_rect'], 
                                 axis=1)
     return df
@@ -118,4 +119,10 @@ def scale(X_train, X_val, X_test):
     X_test_norm = scaler.transform(X_test)
     
     return X_train_norm, X_val_norm, X_test_norm
+
+    
+def scale_other(X_other, X_scale):
+    scaler = StandardScaler()
+    scaler.fit(X_scale)
+    return scaler.transform(X_other)
 

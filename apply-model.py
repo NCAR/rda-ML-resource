@@ -363,6 +363,17 @@ def custom_predict(X, model, threshold=0.7):
 
 
 def predict_regr(X, model):
+    '''Use the given model (which is predicting the logarithm of the
+    desired quantity) to make predictions for the given input data.
+    
+    Parameters
+    ----------
+    X : pandas.core.frame.DataFrame
+        Processed input data.
+    model : sklearn.ensemble._forest.RandomForestClassifier 
+            or other sklearn classifier
+        Fitted model to get predictions from.
+    '''
     predictions = model.predict(X)
     return 10**predictions
 

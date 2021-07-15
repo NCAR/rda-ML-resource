@@ -362,16 +362,13 @@ def custom_predict(X, model, threshold=0.7):
     return np.array(preds)
 
 
-def translate_predictions(preds, categories_dict, init_val=3.0, ten_pct_pt=10000):
-    '''Translates predictions from categories into actual values.
-    
-    First interprets the predicted category as a value using the
-    given dictionary.
+def predict_regr(X, model):
+    predictions = model.predict(X)
+    return 10**predictions
 
-    Then multiplies that amount by a scaling factor which begins
-    at the given init_val and decays for higher memory values,
-    reaching a value of 1.1 (thus scaling by 10%) at the 
-    given value called ten_pct_pt. 
+
+def translate_predictions(preds, categories_dict):
+    '''Translates predictions from categories into actual values.
        
     Parameters
     ----------
@@ -379,19 +376,33 @@ def translate_predictions(preds, categories_dict, init_val=3.0, ten_pct_pt=10000
         Array of predicted categories.
     categories_dict : dict
         Dictionary to translate categories into values.
-    init_val : float (default 3.0)
+    
+    '''
+    return [categories_dict[category] for category in preds]
+
+def scale_predictions(preds, init_val, ten_pct_pt):
+    '''Multiplies the given predictions by a scaling factor which begins
+    at the given init_val and decays for higher memory values,
+    reaching a value of 1.1 (thus scaling by 10%) at the 
+    given value called ten_pct_pt.
+    
+    Parameters
+    ----------
+    preds : numpy.ndarray of shape (n_entries,)
+        Array of predicted values.
+    init_val : float
         Initial scaling value. Values close to zero will be scaled up by
         approximately this amount.
-    ten_pct_pt : int (default 10000)
+    ten_pct_pt : int
         Ten percent point. Values near the ten percent point will be 
         scaled up by approximately 10%.
     '''
+    
     a = init_val - 1
     b = (1/ten_pct_pt)*math.log(0.1/a)
     
     scaled_preds = []
-    for category in preds:
-        val = categories_dict[category]
+    for val in preds:
         val *= 1 + a*exp(b*val)
         val = round(val)
         scaled_preds.append(val)
@@ -507,18 +518,23 @@ def predict_with_model(X, model, categories_dict, target):
             or other sklearn classifier
         Fitted model to get predictions from.
     target : str
-        Either 'mem' or 'time'.
+        Either 'mem', 'time', or 'time_regr'.
     '''
-    pred_categories = custom_predict(X, model)
-    
-    if target == 'mem':
+    if target == 'mem' or target == 'time':
+        pred_categories = custom_predict(X, model)
         predictions = translate_predictions(pred_categories, 
-                                        categories_dict,
+                                            categories_dict)
+    elif target == 'time_regr':
+        predictions = predict_regr(X, model)
+    if target == 'mem':                               
+        predictions = scale_predictions(predictions, 
                                         **settings['mem_scaling'])
-    else:
-        predictions = translate_predictions(pred_categories, 
-                                        categories_dict,
+    elif target == 'time':
+        predictions = scale_predictions(predictions, 
                                         **settings['time_scaling'])
+    else:
+        predictions = scale_predictions(predictions, 
+                                        **settings['time_regr_scaling'])
     
     return predictions
 
@@ -540,6 +556,78 @@ def format_predictions(mem, time):
     
     return output_string
 
+
+def load_time_regr_model():
+    '''Loads the time regression model and returns the model itself,
+    the X features of the model, and the input data the model was 
+    trained on (for scaling purposes).
+    '''
+    time_regr_path = settings['model_paths']['time_regr']
+    
+    ms = model_saver()
+    ms.load(time_regr_path)
+    
+    model, _, X_features, X_train = ms.get_min()
+    return model, X_features, X_train
+
+def predict_time_regr(request_type, rinfo):
+    '''Predict how much time the given request will take, in seconds,
+    for the purposes of a time-to-solution estimate on the
+    website. This includes loading the model. Prints the result.
+    
+    Parameters
+    ----------
+    request_type : str
+        Either 'SP', 'PP', or 'BR'.
+    rinfo : str
+        Full rinfo string of request to be estimated.
+    '''
+    model, X_features, X_train = load_time_regr_model()
+    
+    input_df = pd.DataFrame([[request_type, rinfo]], 
+                              columns=['request_type', 'rinfo'])
+    input_df = add_rinfo_features(input_df)
+    input_df = combine_redundant_features(input_df)
+    
+    X = process_with_model(input_df, X_features, X_train)
+    pred = predict_with_model(X, model, None, 'time_regr')
+    
+    print(pred[0])
+    
+def predict_time_regr_no_load(request_type, rinfo, model, X_features, X_train):
+    '''Predict how much time the given request will take, in seconds,
+    for the purposes of a time-to-solution estimate on the
+    website. Here the model and its data can be passed as parameters,
+    so that the model can be loaded once while this function can be called
+    many times.
+    
+    Prints the result.
+    
+    Parameters
+    ----------
+    request_type : str
+        Either 'SP', 'PP', or 'BR'.
+    rinfo : str
+        Full rinfo string of request to be estimated.
+    model : sklearn.ensemble._forest.RandomForestClassifier 
+            or other sklearn classifier
+        Fitted model to get predictions from.
+    X_features : list
+        List of feature names the model uses.
+    X_train: pandas.core.frame.DataFrame
+        Training set the model used (unscaled).
+    '''
+    
+    input_df = pd.DataFrame([[request_type, rinfo]], 
+                              columns=['request_type', 'rinfo'])
+    input_df = add_rinfo_features(input_df)
+    input_df = combine_redundant_features(input_df)
+    
+    X = process_with_model(input_df, X_features, X_train)
+    
+    pred = predict_with_model(X, model, None, 'time_regr')
+    print(pred[0])
+
 def main():
     get_settings()
     save_paths = settings['model_paths']
@@ -547,11 +635,10 @@ def main():
     rindex, request_type = read_args()
     rinfo = get_rinfo(rindex)
 
-    input_df = pd.DataFrame([[request_type, rinfo]], columns=['request_type', 'rinfo'])
+    input_df = pd.DataFrame([[request_type, rinfo]], 
+                              columns=['request_type', 'rinfo'])
     input_df = add_rinfo_features(input_df)
     input_df = combine_redundant_features(input_df)
-    
-    predictions = []
     
     for target in ['mem', 'time']:
         ms = model_saver()

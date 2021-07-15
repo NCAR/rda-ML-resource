@@ -18,17 +18,25 @@ import json
 import sys
 import logging
 
-log_file = '/glade/u/home/jdubeau/github/rda-ML-resource/apply-model.log'
-logging.basicConfig(filename=log_file,
-                    format='%(asctime)s %(levelname)-8s %(message)s',
-                    level=logging.INFO,
-                    datefmt='%Y-%m-%d %H:%M:%S')
-
 def get_settings():
+    '''Loads settings from the config file as a global variable
+    called 'settings'.
+    '''
+    
     global settings
-    config_file = open("/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json")
+    config_path = "/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json"
+    config_file = open(config_path)
     settings = json.load(config_file)
     config_file.close()
+    
+def logging_setup():
+    '''Sets up logging module.
+    '''
+    log_file = settings['logging']['file_path']
+    logging.basicConfig(filename=log_file,
+                    format='%(asctime)s %(levelname)-8s %(message)s',
+                    level=settings['logging']['level'],
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 def read_args():
     '''Reads command-line arguments and returns them, after translating the

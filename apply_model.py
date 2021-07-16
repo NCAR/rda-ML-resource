@@ -19,7 +19,7 @@ from preprocessing import add_new_features, \
 from persistence import model_saver
 
 
-def get_settings(config_path="/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json"):
+def get_settings(config_path="/glade/u/home/jdubeau/github/rda-ML-resource/model_config.json"):
     """Loads settings from a file.
 
     Parameters

@@ -101,8 +101,41 @@ def handle_missing(df):
                                 129600 if row['rqst_area_rect'] != row['rqst_area_rect'] 
                                 else row['rqst_area_rect'], 
                                 axis=1)
+    df['rqst_timespan'] = df.apply(lambda row: 
+                                36500 if row['rqst_timespan'] != row['rqst_timespan'] 
+                                else row['rqst_timespan'], 
+                                axis=1)
     return df
 
+def categorize(row, target, categories_dict):
+    if target == 'mem': 
+        val = row['used_mem']
+    elif target == 'time':
+        val = row['wall_time']
+    else:
+        raise ValueError
+    
+    num_classes = len(categories_dict)
+    
+    if val < categories_dict[0]:
+        return 0
+    for i in range(1, num_classes):
+        if val >= categories_dict[i-1] and val < categories_dict[i]:
+            return i
+    return None
+
+def make_category_col(df, target, categories_dict):
+    if target == 'mem':
+        new_column_name = 'mem_category'
+    elif target == 'time':
+        new_column_name = 'time_category'
+    else:
+        raise ValueError    
+    df[new_column_name] = df.apply(lambda row: categorize(row,
+                                                          target,
+                                                          categories_dict),
+                                   axis=1)
+    return df
 
 def get_df():
     df = load_data()

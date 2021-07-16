@@ -178,13 +178,10 @@ def get_rinfo_val(rinfo, feature, rinfo_feature_names):
 
     Parameters
     ----------
-    rinfo : str
-        Full rinfo string.
-    feature : str
-        Name of feature from rinfo string.
-    alternate_names : dict
-        Dictionary relating each feature name to a list of alternate
-        names for the same feature.
+    rinfo (str): Full rinfo string.
+    feature (str): Name of feature from rinfo string.
+    alternate_names (dict): Dictionary relating each feature name to a list 
+        of alternate names for the same feature.
         
     Returns
     ----------
@@ -219,8 +216,7 @@ def valid_rinfo(rinfo):
 
     Parameters
     ----------
-    rinfo : str
-        Full rinfo string.
+    rinfo (str): Full rinfo string.
         
     Returns
     ----------
@@ -245,7 +241,7 @@ def parse_lats_lons(val):
 
     Parameters
     ----------
-    val : str
+    val (str):
         String representing 'lats' or 'lons' value.
         
     Returns
@@ -277,10 +273,8 @@ def update_lat_lon(feature, row):
 
     Parameters
     ----------
-    feature : str
-        Name of feature to be updated (slat, nlat, wlon, or elon).
-    row : pandas.core.series.Series
-        Row of dataframe to be updated.
+    feature (str): Name of feature to be updated (slat, nlat, wlon, or elon).
+    row (pandas.core.series.Series): Row of dataframe to be updated.
         
     Returns
     ----------
@@ -315,10 +309,8 @@ def parse_dates(feature, dates):
 
     Parameters
     ----------
-    feature : str
-        Name of feature to be parsed out of 'dates' column.
-    dates : str
-        Content of 'dates' column.
+    feature (str): Name of feature to be parsed out of 'dates' column.
+    dates (str): Content of 'dates' column.
         
     Returns
     ----------
@@ -354,10 +346,8 @@ def update_dates(feature, row):
 
     Parameters
     ----------
-    feature : str
-        Name of feature to be updated.
-    row : pandas.core.series.Series
-        Row to be updated.
+    feature (str): Name of feature to be updated.
+    row (pandas.core.series.Series): Row to be updated.
         
     Returns
     ----------
@@ -386,11 +376,10 @@ def custom_predict(X, model, threshold=0.7):
 
     Parameters
     ----------
-    X : numpy.ndarray of shape (n_entries, n_features)
-        2-D array of entries to predict.
-    model : sklearn.ensemble._forest.RandomForestClassifier
-            or other sklearn classifier
-        Fitted model to get predictions from.
+    X (numpy.ndarray): 2-D array of shape (n_entries, n_features) of 
+        entries to predict. 
+    model (sklearn.ensemble._forest.RandomForestClassifier
+            or other sklearn classifier): Fitted model to get predictions from.
         
     Returns
     ----------
@@ -429,16 +418,14 @@ def translate_predictions(preds, categories_dict, init_val=3.0, ten_pct_pt=10000
 
     Parameters
     ----------
-    preds : numpy.ndarray of shape (n_entries,)
-        Array of predicted categories.
-    categories_dict : dict
-        Dictionary to translate categories into values.
-    init_val : float (default 3.0)
-        Initial scaling value. Values close to zero will be scaled up by
-        approximately this amount.
-    ten_pct_pt : int (default 10000)
-        Ten percent point. Values near the ten percent point will be
-        scaled up by approximately 10%.
+    preds (numpy.ndarray): Array of shape (n_entries,) of predicted 
+        categories.
+    categories_dict (dict): Dictionary to translate categories into 
+        values.
+    init_val (float): Initial scaling value. Values close to zero will 
+        be scaled up by approximately this amount.
+    ten_pct_pt (int): Ten percent point. Values near the ten percent point 
+        will be scaled up by approximately 10%.
         
     Returns
     ----------
@@ -496,8 +483,7 @@ def add_rinfo_features(df):
 
     Parameters
     ----------
-    df : pandas.core.frame.DataFrame
-        Dataframe with rinfo column.
+    df (pandas.core.frame.DataFrame): Dataframe with rinfo column.
         
     Returns
     ----------
@@ -524,8 +510,7 @@ def combine_redundant_features(df):
 
     Parameters
     ----------
-    df : pandas.core.frame.DataFrame
-        Dataframe to process.
+    df (pandas.core.frame.DataFrame): Dataframe to process.
         
     Returns
     ----------
@@ -554,12 +539,9 @@ def process_with_model(df, X_features, X_train):
 
     Parameters
     ----------
-    df : pandas.core.frame.DataFrame
-        Dataframe to process.
-    X_features : list
-        List of feature names the model uses.
-    X_train: pandas.core.frame.DataFrame
-        Training set the model used (unscaled).
+    df (pandas.core.frame.DataFrame): Dataframe to process.
+    X_features (list): List of feature names the model uses.
+    X_train (pandas.core.frame.DataFrame): Training set the model used (unscaled).
         
     Returns
     ----------
@@ -580,13 +562,10 @@ def predict_with_model(X, model, categories_dict, target):
 
     Parameters
     ----------
-    X : pandas.core.frame.DataFrame
-        Processed input data.
-    model : sklearn.ensemble._forest.RandomForestClassifier
-            or other sklearn classifier
-        Fitted model to get predictions from.
-    target : str
-        Either 'mem' or 'time'.
+    X (pandas.core.frame.DataFrame): Processed input data.
+    model (sklearn.ensemble._forest.RandomForestClassifier
+        or other sklearn classifier): Fitted model to get predictions from.
+    target (str): Either 'mem' or 'time'.
         
     Returns
     ----------
@@ -610,10 +589,8 @@ def format_predictions(mem, time):
 
     Parameters
     ----------
-    mem : int
-        Number of megabytes predicted.
-    time : int
-        Number of seconds predicted.
+    mem (int): Number of megabytes predicted.
+    time (int): Number of seconds predicted.
         
     Returns
     ----------

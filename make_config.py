@@ -2,7 +2,7 @@ import json
 import logging
 
 def main():
-    config_file = open("model-config.json", 'w')
+    config_file = open("model_config.json", 'w')
     
     settings_dict = {}
     
@@ -19,7 +19,7 @@ def main():
     settings_dict['time_regr_scaling'] = {'init_val': 1.5, 
                                           'ten_pct_pt': 1000}
     
-    settings_dict['logging'] = {'file_path': '/glade/u/home/jdubeau/github/rda-ML-resource/apply-model.log',
+    settings_dict['logging'] = {'file_path': '/glade/u/home/jdubeau/github/rda-ML-resource/apply_model.log',
                                 'level': logging.INFO}
     
     json.dump(settings_dict, config_file, indent=4)

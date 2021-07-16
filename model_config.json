@@ -17,7 +17,7 @@
         "ten_pct_pt": 1000
     },
     "logging": {
-        "file_path": "/glade/u/home/jdubeau/github/rda-ML-resource/apply-model.log",
+        "file_path": "/glade/u/home/jdubeau/github/rda-ML-resource/apply_model.log",
         "level": 20
     }
 }

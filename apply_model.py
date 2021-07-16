@@ -47,6 +47,7 @@ def logging_setup():
         None
     '''
     log_file = settings['logging']['file_path']
+
     logging.basicConfig(filename=log_file,
                     format='%(asctime)s %(levelname)-8s %(message)s',
                     level=settings['logging']['level'],
@@ -719,6 +720,7 @@ def predict_time_regr_no_load(request_type, rinfo, model, X_features, X_train):
 
 def main(rindex, request_type):
     get_settings()
+
     save_paths = settings['model_paths']
 
     rinfo = get_rinfo(rindex)
@@ -744,6 +746,8 @@ def main(rindex, request_type):
 
 if __name__ == "__main__":
     try:
+        get_settings()
+        logging_setup()
         rindex, request_type = read_args()
         main(rindex, request_type)
     except Exception as e:

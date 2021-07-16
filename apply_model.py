@@ -3,42 +3,42 @@
 Takes in an rindex number and request type, and uses the current best
 ML models to predict the time and the request will use.
 """
+import sys
+from math import exp, log
+import json
+import logging
+import pandas as pd
+import numpy as np
 import cProfile
 import pstats
 from pstats import SortKey
-import pandas as pd
-import numpy as np
-from preprocessing import add_new_features
-from preprocessing import handle_missing
-from preprocessing import scale_other
-from persistence import model_saver
-import math
-from math import exp
 import mysql.connector
-import json
-import sys
-import logging
+from preprocessing import add_new_features, \
+                          handle_missing, \
+                          scale_other
+from persistence import model_saver
 
-log_file = '/glade/u/home/jdubeau/github/rda-ML-resource/apply-model.log'
+
+log_file = '/glade/u/home/jdubeau/github/rda-ML-resource/apply_model.log'
 logging.basicConfig(filename=log_file,
                     format='%(asctime)s %(levelname)-8s %(message)s',
                     level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-def get_settings(config_file="/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json"):
+def get_settings(config_path="/glade/u/home/jdubeau/github/rda-ML-resource/model-config.json"):
     """Loads settings from a file.
 
     Parameters
     ----------
         config_file (str): File to load.
 
-    Returns:
+    Returns
+    ----------
         None
     """
     global settings
-    config_file = open()
-    settings = json.load(config_file)
-    config_file.close()
+    with open(config_path) as config_file:
+        settings = json.load(config_file)
 
 def read_args():
     """Reads command-line arguments and returns them, after translating the
@@ -47,8 +47,13 @@ def read_args():
     The given rindex must be an integer and the given request type must
     be one of P, R, S.
 
-    Returns:
-        (tuple): (rindex, request_type)
+    Parameters
+    ----------
+        None
+        
+    Returns
+    ----------
+        (tuple): rindex (int) and request_type (str).
     """
     rtype_dict = {'P':'PP', 'R':'BR', 'S':'SP'}
 
@@ -67,11 +72,11 @@ def get_rinfo(rindex):
 
     Parameters
     ----------
-    rindex : int
-        rindex number to look up.
+    rindex (int): rindex number to look up.
 
-    returns
-        (str) rinfo
+    Returns
+    ----------
+        (str): rinfo string.
     """
     credentials_path = '/glade/u/home/jdubeau/github/rda-ML-resource/dsrqst-creds.json'
     credentials = json.load(open(credentials_path))
@@ -100,10 +105,11 @@ def handle_missing_rinfo_val(feature):
 
     Parameters
     ----------
-    feature : str
-        Name of feature to decide null value for.
+    feature (str): Name of feature to decide null value for.
 
-    Returns (bool or pd.NaT or NaN): The null value when a feature is missing
+    Returns
+    ----------
+        (bool or pandas.NaT or NaN): The null value when a feature is missing.
     """
 
     if feature == 'gui':
@@ -127,12 +133,17 @@ def format_rinfo_val(rinfo, feature, val):
 
     Parameters
     ----------
-    rinfo : str
-        Full rinfo string. (Used to print error message when conversion fails.)
-    feature : str
-        Name of feature from rinfo string.
-    val : str
-        Value of given feature (as a string) to be converted.
+    rinfo (str): Full rinfo string. (Used to print error 
+        message when conversion fails.)
+    feature (str): Name of feature from rinfo string.
+    val (str): Value of given feature (as a string) to be converted.
+    
+    Returns
+    ----------
+        (float or bool 
+         or pandas._libs.tslibs.timestamps.Timestamp
+         or pandas.NaT or NaN): The value of the feature converted
+            into the correct data type.
     """
 
     if val == '':
@@ -174,6 +185,10 @@ def get_rinfo_val(rinfo, feature, rinfo_feature_names):
     alternate_names : dict
         Dictionary relating each feature name to a list of alternate
         names for the same feature.
+        
+    Returns
+    ----------
+        (str): The value of the feature.
     """
 
     rinfo = rinfo.replace('%3D', '=')
@@ -206,6 +221,10 @@ def valid_rinfo(rinfo):
     ----------
     rinfo : str
         Full rinfo string.
+        
+    Returns
+    ----------
+        (bool): Whether the given rinfo is valid.
     """
     if '\\n' in rinfo:
         return False
@@ -228,16 +247,16 @@ def parse_lats_lons(val):
     ----------
     val : str
         String representing 'lats' or 'lons' value.
+        
+    Returns
+    ----------
+        (tuple): First coord (float), second coord (float).
     """
     val = val.replace(',', '')
     substrings = val.split(' ')
-
-    try:
-        first_coord = float(substrings[0])
-        second_coord = float(substrings[2])
-    except:
-        print(f"Error expanding lats/lons. Value = {val}")
-        return (float('nan'), float('nan'))
+    
+    first_coord = float(substrings[0])
+    second_coord = float(substrings[2])
 
     if substrings[1] == 'W' or substrings[1] == 'S':
         first_coord = -1*first_coord
@@ -262,6 +281,10 @@ def update_lat_lon(feature, row):
         Name of feature to be updated (slat, nlat, wlon, or elon).
     row : pandas.core.series.Series
         Row of dataframe to be updated.
+        
+    Returns
+    ----------
+        (float): Desired coordinate.
     """
     # First check to see if there is a non-null value for
     # 'lats' or 'lons' in the row. The two always come together,
@@ -296,6 +319,10 @@ def parse_dates(feature, dates):
         Name of feature to be parsed out of 'dates' column.
     dates : str
         Content of 'dates' column.
+        
+    Returns
+    ----------
+        (pandas._libs.tslibs.timestamps.Timestamp): Desired date/time.
     """
     dates_split = dates.split(' ')
 
@@ -331,6 +358,11 @@ def update_dates(feature, row):
         Name of feature to be updated.
     row : pandas.core.series.Series
         Row to be updated.
+        
+    Returns
+    ----------
+        (pandas._libs.tslibs.timestamps.Timestamp
+         or pandas.NaT): Desired date/time.
     """
     dates = row['dates']
 
@@ -359,6 +391,10 @@ def custom_predict(X, model, threshold=0.7):
     model : sklearn.ensemble._forest.RandomForestClassifier
             or other sklearn classifier
         Fitted model to get predictions from.
+        
+    Returns
+    ----------
+        (numpy.ndarray): Predicted categories.
     """
     probas = model.predict_proba(X)
     preds = []
@@ -403,9 +439,13 @@ def translate_predictions(preds, categories_dict, init_val=3.0, ten_pct_pt=10000
     ten_pct_pt : int (default 10000)
         Ten percent point. Values near the ten percent point will be
         scaled up by approximately 10%.
+        
+    Returns
+    ----------
+        (list): Predicted values.
     """
     a = init_val - 1
-    b = (1/ten_pct_pt)*math.log(0.1/a)
+    b = (1/ten_pct_pt)*log(0.1/a)
 
     scaled_preds = []
     for category in preds:
@@ -421,6 +461,14 @@ def get_rinfo_feature_names():
     and what other possible names those features could have. Returns
     a dictionary mapping each feature name to a list of possible
     feature names representing the same value.
+    
+    Parameters
+    ----------
+        None
+    
+    Returns
+    ----------
+        (dict): Rinfo feature names with their alternate names.
     """
     all_rinfo_features = ['dates', 'dsnum', 'elon', 'enddate',
                           'format', 'grid_definition', 'gui',
@@ -450,6 +498,11 @@ def add_rinfo_features(df):
     ----------
     df : pandas.core.frame.DataFrame
         Dataframe with rinfo column.
+        
+    Returns
+    ----------
+        (pandas.core.frame.DataFrame): Dataframe with features added from
+            rinfo string.
     """
     rinfo_feature_names = get_rinfo_feature_names()
 
@@ -473,6 +526,11 @@ def combine_redundant_features(df):
     ----------
     df : pandas.core.frame.DataFrame
         Dataframe to process.
+        
+    Returns
+    ----------
+        (pandas.core.frame.DataFrame): Dataframe with redundant features
+            combined.
     """
     for feature in ['slat', 'nlat', 'wlon', 'elon']:
         df[feature] = df.apply(lambda row: update_lat_lon(feature, row), axis = 1)
@@ -502,6 +560,10 @@ def process_with_model(df, X_features, X_train):
         List of feature names the model uses.
     X_train: pandas.core.frame.DataFrame
         Training set the model used (unscaled).
+        
+    Returns
+    ----------
+        (numpy.ndarray): Input data ready for model prediction.
     """
     new_features = [feat for feat in X_features if feat not in df.columns]
     df = add_new_features(df, new_features)
@@ -510,7 +572,6 @@ def process_with_model(df, X_features, X_train):
 
     X = df[X_features]
     X = scale_other(X, X_train)
-
     return X
 
 def predict_with_model(X, model, categories_dict, target):
@@ -526,6 +587,10 @@ def predict_with_model(X, model, categories_dict, target):
         Fitted model to get predictions from.
     target : str
         Either 'mem' or 'time'.
+        
+    Returns
+    ----------
+        (list): Predicted values.
     """
     pred_categories = custom_predict(X, model)
 
@@ -549,6 +614,10 @@ def format_predictions(mem, time):
         Number of megabytes predicted.
     time : int
         Number of seconds predicted.
+        
+    Returns
+    ----------
+        (str): PBS request string.
     """
     mem_string = str(mem)+'mb'
 
@@ -558,11 +627,10 @@ def format_predictions(mem, time):
 
     return output_string
 
-def main():
+def main(rindex, request_type):
     get_settings()
     save_paths = settings['model_paths']
 
-    rindex, request_type = read_args()
     rinfo = get_rinfo(rindex)
 
     input_df = pd.DataFrame([[request_type, rinfo]], columns=['request_type', 'rinfo'])
@@ -585,7 +653,8 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        rindex, request_type = read_args()
+        main(rindex, request_type)
     except Exception as e:
         logging.error(e, exc_info=True)
         # Default value: 1234mb, 11:58:20 walltime

@@ -21,18 +21,18 @@ def timespan_feat(row):
 
 
 def list_length_feat(feature, row, sep = ','):
-    if row[feature] != None and row[feature] == row[feature]:
+    if not pd.isnull(row[feature]):
         return len(row[feature].split(sep))
     else:
-        return 0
+        return None
 
 
 def params_num_feat(row):
-    if row['parameters'] != None:
+    if not pd.isnull(row['parameters']):
         sep = ',' if ',' in row['parameters'] else ' '
         return list_length_feat('parameters', row, sep = sep)
     else:
-        return 0
+        return None
 
 
 def rqst_area_feat(row):
@@ -40,15 +40,21 @@ def rqst_area_feat(row):
 
 
 def rtype_feat(feature, row):
-    return True if row['request_type'] == feature else False
+    if not pd.isnull(row['request_type']):
+        return True if row['request_type'] == feature else False
+    else:
+        return None
 
 
 def converted_feat(row):
-    return True if row['format'] != None else False
+    return False if pd.isnull(row['format']) else True
 
 
 def dsnum_feat(feature, row):
-    return row['dsnum'] == feature[2:]
+    if not pd.isnull(row['dsnum']):
+        return row['dsnum'] == feature[2:]
+    else:
+        return None
 
 
 def add_feature(feature, df):
@@ -56,6 +62,8 @@ def add_feature(feature, df):
         df[feature] = df.apply(lambda row: walltime_feat(row), axis=1)
     elif feature == 'rqst_timespan':
         df[feature] = df.apply(lambda row: timespan_feat(row), axis=1)
+    elif feature == 'rqst_area_rect':
+        df[feature] = df.apply(lambda row: rqst_area_feat(row), axis=1)
     elif feature == 'grid_def_num':
         df[feature] = df.apply(lambda row:
                                list_length_feat('grid_definition', row),
@@ -69,13 +77,12 @@ def add_feature(feature, df):
                                axis=1)
     elif feature == 'params_num':
         df[feature] = df.apply(lambda row: params_num_feat(row), axis=1)
-    elif feature == 'rqst_area_rect':
-        df[feature] = df.apply(lambda row: rqst_area_feat(row), axis=1)
+    
     elif feature in ['PP', 'SP', 'BR']:
         df[feature] = df.apply(lambda row: rtype_feat(feature, row), axis=1)
     elif feature == 'converted':
         df[feature] = df.apply(lambda row: converted_feat(row), axis=1)
-    elif feature[:2] == 'ds':
+    elif feature.startswith('ds'):
         df[feature] = df.apply(lambda row: dsnum_feat(feature, row), axis=1)
         
     return df
@@ -86,9 +93,9 @@ def add_new_features(df, new_features=None):
                         'product_num', 'station_num', 'params_num', 
                         'rqst_area_rect', 'PP', 'SP', 'BR', 'converted']
     
-    most_common = df['dsnum'].value_counts()[:5].index.tolist()
-    for common_id in most_common:
-        new_features.append('ds' + common_id)
+        most_common = df['dsnum'].value_counts()[:5].index.tolist()
+        for common_id in most_common:
+            new_features.append('ds' + common_id)
         
     for feature in new_features:
         df = add_feature(feature, df)
@@ -96,15 +103,29 @@ def add_new_features(df, new_features=None):
     return df
 
 
-def handle_missing(df):
-    df['rqst_area_rect'] = df.apply(lambda row: 
-                                129600 if row['rqst_area_rect'] != row['rqst_area_rect'] 
-                                else row['rqst_area_rect'], 
-                                axis=1)
-    df['rqst_timespan'] = df.apply(lambda row: 
-                                36500 if row['rqst_timespan'] != row['rqst_timespan'] 
-                                else row['rqst_timespan'], 
-                                axis=1)
+def default_value(feature):
+    if feature == 'rqst_timespan':
+        return 36500
+    elif feature == 'rqst_area_rect':
+        return 129600
+    elif feature.endswith('_num'):
+        return 0
+    elif feature == 'converted':
+        return False
+    elif feature.startswith('ds'):
+        return False
+    elif feature in ['PP', 'BR']:
+        return False
+    elif feature in ['SP']:
+        return True
+    
+
+
+def fill_missing(df, features):
+    for feature in features: 
+        df[feature] = df.apply(lambda row: default_value(feature) if pd.isnull(row[feature]) \
+                                                                  else row[feature],
+                               axis=1)
     return df
 
 def categorize(row, target, categories_dict):
@@ -140,7 +161,7 @@ def make_category_col(df, target, categories_dict):
 def get_df():
     df = load_data()
     df = add_new_features(df)
-    df = handle_missing(df)
+    df = fill_missing(df)
     return df
 
 def scale(X_train, X_val, X_test):

@@ -14,7 +14,7 @@ import pstats
 from pstats import SortKey
 import mysql.connector
 from preprocessing import add_new_features, \
-                          handle_missing, \
+                          fill_missing, \
                           scale_other
 from persistence import model_saver
 
@@ -49,7 +49,10 @@ def logging_setup():
     log_file = settings['logging']['file_path']
 
     logging.basicConfig(filename=log_file,
-                    format='%(asctime)s %(levelname)-8s %(message)s',
+                    format='\nRindex: %(rindex)s \n' \
+                           + 'Time: %(asctime)s \n' \
+                           + 'Level: %(levelname)-8s \n' \
+                           + 'Message: %(message)s',
                     level=settings['logging']['level'],
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -130,6 +133,8 @@ def handle_missing_rinfo_val(feature):
         return False
     elif feature in ['startdate', 'enddate']:
         return pd.NaT
+    elif feature in ['wlon', 'elon', 'slat', 'nlat', 'tindex']:
+        return float('nan')
     else:
         return float('nan')
 
@@ -583,7 +588,7 @@ def process_with_model(df, X_features, X_train):
     new_features = [feat for feat in X_features if feat not in df.columns]
     df = add_new_features(df, new_features)
 
-    df = handle_missing(df)
+    df = fill_missing(df, X_features)
 
     X = df[X_features]
     X = scale_other(X, X_train)
@@ -716,7 +721,41 @@ def predict_time_regr_no_load(request_type, rinfo, model, X_features, X_train):
     
     pred = predict_with_model(X, model, None, 'time_regr')
     print(pred[0])
+    
 
+def predict_for_testing(df):
+    '''Takes in a dataframe containing request_type and rinfo columns, and
+    adds 'pred_mem_script', 'pred_time_script', and 'pred_time_regr_script'
+    columns to it.
+    
+    Parameters
+    ----------
+    df (pandas.core.frame.DataFrame): Dataframe with 'request_type' and 
+        'rinfo' columns.
+        
+    Returns
+    ----------
+        (pandas.core.frame.DataFrame): Dataframe with prediction columns
+            added.
+    '''
+    get_settings()
+    save_paths = settings['model_paths']
+    
+    input_df = df[['request_type', 'rinfo']].copy()
+
+    input_df = add_rinfo_features(input_df)
+    input_df = combine_redundant_features(input_df)
+
+    for target in ['mem', 'time', 'time_regr']:
+        ms = model_saver()
+        ms.load(save_paths[target])
+        model, categories_dict, X_features, X_train = ms.get_min()
+        X = process_with_model(input_df, X_features, X_train)
+        pred = predict_with_model(X, model, categories_dict, target)
+        column_name = 'pred_'+target+'_script'
+        df[column_name] = pred
+
+    return df
 
 def main(rindex, request_type):
     get_settings()
@@ -751,6 +790,9 @@ if __name__ == "__main__":
         rindex, request_type = read_args()
         main(rindex, request_type)
     except Exception as e:
-        logging.error(e, exc_info=True)
+        extra_info = {}
+        extra_info['rindex'] = rindex
+
+        logging.error(e, exc_info=True, extra=extra_info)
         # Default value: 1234mb, 11:58:20 walltime
         print(format_predictions(1234, 43100))

@@ -349,7 +349,7 @@ def make_category_col(df, target, categories_dict):
     return df
 
 
-def get_df(training_path=='/glade/work/jdubeau/job-metrics-training.json'):
+def get_df(training_path='/glade/work/jdubeau/job-metrics-training.json'):
     '''Loads the stored training data and preprocesses it for training.
     
     Parameters

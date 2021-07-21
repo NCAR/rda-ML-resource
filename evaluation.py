@@ -6,8 +6,11 @@ from sklearn.metrics import plot_confusion_matrix, \
                             roc_auc_score
 
 
-def score_regressor(X_train, y_train, X_val, y_val, model):
-    """Prints the training and validation score of a regression model.
+def score_regressor(X_train, y_train, X_eval, y_eval, model):
+    """Prints the training and evaluation score of a regression model.
+    
+    The evaluation data can be either the validation or testing data,
+    depending on how the model was trained.
     
     The score in this case R^2 coefficient, defined as 1 - u/v, where 
     u is the sum over all samples of (y_true - y_pred)^2, and v is the 
@@ -23,10 +26,10 @@ def score_regressor(X_train, y_train, X_val, y_val, model):
                        or numpy.ndarray): Training input data.
     y_train (pandas.core.frame.DataFrame
                        or numpy.ndarray): Training output values.
-    X_val (pandas.core.frame.DataFrame
-                       or numpy.ndarray): Validation input data.
-    X_train (pandas.core.frame.DataFrame
-                       or numpy.ndarray): Validation output values.
+    X_eval (pandas.core.frame.DataFrame
+                       or numpy.ndarray): Evaluation input data.
+    y_eval (pandas.core.frame.DataFrame
+                       or numpy.ndarray): Evaluation output values.
     model (sklearn regressor): Model to score. 
 
     Returns
@@ -34,10 +37,10 @@ def score_regressor(X_train, y_train, X_val, y_val, model):
         None
     """
     train_score = round(model.score(X_train, y_train), 4)
-    val_score = round(model.score(X_val, y_val), 4)
+    eval_score = round(model.score(X_eval, y_eval), 4)
 
     print(f"Training score: {train_score}")
-    print(f"Validation score: {val_score}")
+    print(f"Evaluation score: {eval_score}")
     
 def print_feature_importances(X_features, model):
     """Prints the name of each feature along with the corresponding

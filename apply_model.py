@@ -33,8 +33,9 @@ def get_settings(config_path="/glade/u/home/jdubeau/github/rda-ML-resource/model
     global settings
     with open(config_path) as config_file:
         settings = json.load(config_file)
+        
+    return settings
 
-    
 def logging_setup():
     '''Sets up logging module.
     

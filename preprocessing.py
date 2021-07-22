@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-def load_data(training_path):
+def load_data(training_path='/glade/work/jdubeau/job-metrics-training.json'):
     """Load training data from the given path.
 
     Note: simply calling pd.read_json would cause 'dsnum' to be interpreted
@@ -263,7 +263,7 @@ def default_value(feature):
         raise ValueError(f"Feature {feature} has no default value set.")
 
 
-def fill_missing(df, features):
+def fill_missing(df, features=None):
     """Fill all null values in the specified columns with the default values
     provided by default_value().
 
@@ -276,6 +276,12 @@ def fill_missing(df, features):
     ----------
         (pandas.core.frame.DataFrame): Dataframe with new features added.
     """
+    if features == None:
+        features = ['rqst_timespan', 'rqst_area_rect',
+                    'grid_def_num', 'level_num', 'product_num',
+                    'station_num', 'params_num', 'PP', 'SP', 'BR']
+        features.extend([col_name for col_name in df.columns if col_name.startswith('ds')])
+
     for feature in features:
         df[feature] = df.apply(lambda row: default_value(feature) if pd.isnull(row[feature]) \
                                                                   else row[feature],
